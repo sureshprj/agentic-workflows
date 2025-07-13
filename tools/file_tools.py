@@ -85,12 +85,12 @@ def list_files_and_directories(path):
     return result
 
 @tool
-def create_file_with_folders(file_path, content=""):
+def create_file_with_content(file_path, content=""):
     """
     Creates a file at the given path.
     Creates any missing parent directories automatically.
 
-    @function create_file_with_folders
+    @function create_file_with_content
     @param {str} file_path - The file path relative to BASE_PATH.
     @param {str} content - Optional text content to write into the file. Default is empty string.
     @returns {void}
@@ -146,7 +146,7 @@ def read_file(file_path):
         print(f"Error reading file: {e}")
 
 @tool     
-def edit_file(file_path, new_content, mode='w'):
+def write_file(file_path, new_content, mode='w'):
     """
     Edits a file by either overwriting or appending content.
 
@@ -170,4 +170,4 @@ def edit_file(file_path, new_content, mode='w'):
         print(f"Error editing file: {e}")
         
 
-file_tool_list = [list_files_and_directories, create_file_with_folders, edit_file, read_file]
+file_tool_list = [list_files_and_directories, create_file_with_content, write_file, read_file]

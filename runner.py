@@ -5,8 +5,10 @@ from dotenv import load_dotenv
 from pprint import pprint
 from typing import TypedDict, Annotated
 
-from langchain.schema import HumanMessage
+from langchain_core.prompts import ChatPromptTemplate
+from langchain.schema import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
 from langchain_core.tools import tool
 from langgraph.graph.message import add_messages
 from langgraph.graph import StateGraph, START, END
@@ -24,43 +26,45 @@ os.environ["OPENAI_API_KEY"] = os.environ.get("OPEN_API_KEY")
 
 # === 2. LLM SETUP ===
 
-llm = ChatOpenAI(model_name="gpt-3.5-turbo")
+#llm = ChatOpenAI(model_name="gpt-4-turbo")
+llm = ChatAnthropic(model_name="claude-opus-4-20250514")
+prompt = ChatPromptTemplate.from_messages([
+    ("system", """
+Your sole responsibility is to generate a clear, structured development plan for an e-commerce project based on user input. Another agent will use this plan in the next step to implement the actual code, so ensure each step is precise, actionable, and well-organized.
+
+### Goal:
+Create a development plan for an e-commerce website and save it to the `e-commerce-01/plans.md` file.
+
+You must **immediately use your available tools** to write the plan into the `plans.md` file within the `e-commerce-01/` directory.
 
 
-# === 3. Agent Creation ===
-prompt = """
-Act as a Project Manager.
-Our objective is to build an HTML page along with the corresponding JavaScript functionality, based on user input.
-The project will be structured under the path: 'e-commerce-01`.
+### Instructions:
+- Refer to the sample plan located at `sample/sample_plan.md` for formatting, structure, and tone.
+- If `plans.md` already exists, **append to or update** it as needed.
+- Do **not** respond to the user in plain text.
+- After saving the plan, return a **brief summary** of what was written, then stop all further actions (including tool use).
+- Do **not** initiate or create any development-related files or tasks.
+- Assume the entire development process will be fully automated by AI agents. Avoid unnecessary details such as timelines, resources, or team roles.
+- make multiple tools call if require, 
+### Output:
+Return a short summary of the content added to `plans.md`.
 
-Your task:
 
-Define a clear and actionable implementation plan in a file named plans.md.
-
-The plan should guide the development of the HTML and JavaScript files required to fulfill future user requests.
-
-Assume the user will request various types of e-commerce pages (e.g., product listing, cart page, product detail, checkout, etc.).
-
-Please outline a reusable structure and a flexible development workflow in plans.md to accommodate the different types of e-commerce pages users might request.
-"""
-planning_agent_runnable = create_react_agent(
-    llm,
-    file_tool_list,
-    prompt=prompt
-)
-
+"""),
+    ("human", "{input}")
+])
+planning_agent_runnable = prompt | llm.bind_tools(file_tool_list)
 
 # === 4. GRAPH STATE AND NODES ===
 
 class State(TypedDict):
     messages: Annotated[list, add_messages]
 
-
 def agent_node(state: State) -> State:
     """Chat node that invokes the LLM with tool support."""
-    print(f"before node_invoke {state}")
+   
     response = {"messages": [planning_agent_runnable.invoke(state["messages"])]}
-    print(f"after node_invoke {response}")
+    pprint(f"response from AI: {response['messages'][-1]}")
     return response
 
 
@@ -71,10 +75,12 @@ builder = StateGraph(State)
 
 builder.add_node("agent_node", agent_node)
 builder.add_node("tools", ToolNode(file_tool_list))
+
 builder.add_edge(START, "agent_node")
 builder.add_conditional_edges("agent_node", tools_condition)
 builder.add_edge("tools", "agent_node")
-builder.add_edge("agent_node", END)
+#builder.add_edge("agent_node", END)
+
 graph = builder.compile(checkpointer=memory)
 
 
@@ -97,11 +103,9 @@ def run_chat():
             break
 
         response = graph.invoke({
-            "messages": HumanMessage(content=user_input)
+            "messages": [HumanMessage(content=user_input)]
         }, config)
-
-        chat_history = response["messages"]
-        pprint(chat_history)
+        print(f"after responsee {response['messages'][-1].content}")
 
 
 if __name__ == "__main__":
