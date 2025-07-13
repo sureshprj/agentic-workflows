@@ -32,15 +32,27 @@ def coder_agent_node(state: State) -> State:
 
 # === Conditional Routing Logic ===
 
-def planner_condition(output: dict) -> dict:
-    if "tool_calls" in output["messages"][-1].__dict__:
-        return {"planner_tool_node": True}
-    return {"coder_agent_node": True}  # Transition to coder if planner is done
+def planner_condition(state: State) -> str:
+    """
+    Determines the next step after the planner agent runs.
+    - If the planner calls a tool, route to the planner's tool node.
+    - Otherwise, the plan is complete, so route to the coder agent.
+    """
+    last_message = state["messages"][-1]
+    if hasattr(last_message, "tool_calls") and last_message.tool_calls:
+        return "planner_tool_node"
+    return "coder_agent_node"
 
-def coder_condition(output: dict) -> dict:
-    if "tool_calls" in output["messages"][-1].__dict__:
-        return {"coder_tool_node": True}
-    return {"END": True}  # End flow if coding is done
+def coder_condition(state: State) -> str:
+    """
+    Determines the next step after the coder agent runs.
+    - If the coder calls a tool (e.g., to execute code), route to the coder's tool node.
+    - Otherwise, the coding is finished, so end the graph execution.
+    """
+    last_message = state["messages"][-1]
+    if hasattr(last_message, "tool_calls") and last_message.tool_calls:
+        return "coder_tool_node"
+    return END
 
 # === Graph Setup ===
 
