@@ -56,9 +56,11 @@ class State(TypedDict):
     messages: Annotated[list, add_messages]
 
 
-def chatbot(state: State) -> State:
+def agent_node(state: State) -> State:
     """Chat node that invokes the LLM with tool support."""
+    print(f"before node_invoke {state}")
     response = {"messages": [planning_agent_runnable.invoke(state["messages"])]}
+    print(f"after node_invoke {response}")
     return response
 
 
@@ -67,12 +69,12 @@ def chatbot(state: State) -> State:
 memory = MemorySaver()
 builder = StateGraph(State)
 
-builder.add_node("chat_node", chatbot)
-#builder.add_node("tools", ToolNode(tool_list))
-builder.add_edge(START, "chat_node")
-#builder.add_conditional_edges("chat_node", tools_condition)
-#builder.add_edge("tools", "chat_node")
-
+builder.add_node("agent_node", agent_node)
+builder.add_node("tools", ToolNode(file_tool_list))
+builder.add_edge(START, "agent_node")
+builder.add_conditional_edges("agent_node", tools_condition)
+builder.add_edge("tools", "agent_node")
+builder.add_edge("agent_node", END)
 graph = builder.compile(checkpointer=memory)
 
 
@@ -87,7 +89,7 @@ def show_graph_image():
 
 def run_chat():
     """Runs the chatbot in an interactive loop."""
-    config = {'configurable': {'thread_id': 123}}
+    config = {'configurable': {'thread_id': 133}}
 
     while True:
         user_input = input("You: ")
